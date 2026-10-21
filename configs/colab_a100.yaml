@@ -1,0 +1,73 @@
+# Main experiment: GRPO on Qwen2.5-1.5B, GSM8K train split, exact-match reward.
+# Sized for a single Colab A100 (40 GB). Runs end-to-end in roughly 2-4 hours.
+
+run_name: qwen2.5-1.5b-grpo-gsm8k
+seed: 42
+output_dir: outputs/qwen2.5-1.5b-grpo-gsm8k
+results_dir: results
+
+model:
+  name_or_path: Qwen/Qwen2.5-1.5B
+  dtype: bfloat16
+  attn_implementation: sdpa      # set to flash_attention_2 if flash-attn is installed
+  gradient_checkpointing: true
+  lora:
+    enabled: false               # full fine-tune by default; flip on if you hit OOM
+    r: 32
+    alpha: 64
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+data:
+  dataset: openai/gsm8k
+  config: main
+  train_split: train
+  eval_split: test
+  max_train_samples: null        # null = all 7,473 problems
+  max_eval_samples: null         # null = all 1,319 test problems
+
+prompt:
+  # Same system prompt is used for training rollouts and for both evaluations.
+  system: >-
+    You are a careful math solver. Reason step by step, then give the final
+    numeric answer on its own line in the form: #### <answer>
+
+reward:
+  # Exact-match on the extracted final answer is the only reward by default,
+  # so the headline number is a pure "exact-match math reward" baseline.
+  correctness_weight: 1.0
+  format_weight: 0.0             # optional shaping reward for the "#### x" line
+
+train:
+  max_steps: 500
+  learning_rate: 1.0e-6
+  lr_scheduler_type: constant_with_warmup
+  warmup_ratio: 0.03
+  per_device_train_batch_size: 8 # completions per device per micro-step
+  gradient_accumulation_steps: 8 # 64 completions = 8 prompts x 8 generations per step
+  num_generations: 8
+  max_prompt_length: 512         # GSM8K prompts are ~100-250 tokens; never truncate the system prompt
+  max_completion_length: 512
+  temperature: 1.0
+  beta: 0.0                      # KL coefficient (0 = no reference model, saves memory)
+  epsilon: 0.2
+  loss_type: dr_grpo
+  max_grad_norm: 1.0
+  logging_steps: 5
+  save_steps: 100
+  save_total_limit: 2
+  use_vllm: true
+  vllm_mode: colocate
+  vllm_gpu_memory_utilization: 0.30
+  report_to: none                # set to wandb to track online
+
+eval:
+  batch_size: 64                 # used by the HF-generate fallback
+  max_new_tokens: 512
+  temperature: 0.0               # greedy decoding for both base and trained model
+  use_vllm: true
+  vllm_gpu_memory_utilization: 0.85
+
+hub:
+  push_to_hub: false
+  repo_id: null                  # e.g. UbajakaCJ/qwen2.5-1.5b-grpo-gsm8k

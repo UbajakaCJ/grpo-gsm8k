@@ -1,0 +1,32 @@
+# Pipeline smoke test: tiny model, a handful of steps, a few eval problems.
+# Proves the whole train -> eval -> report loop works before burning A100 hours.
+# Usage: make smoke   (or CONFIG=configs/smoke.yaml make all)
+
+inherit: colab_a100.yaml
+
+run_name: smoke
+output_dir: outputs/smoke
+results_dir: results/smoke
+
+model:
+  name_or_path: Qwen/Qwen2.5-0.5B
+  gradient_checkpointing: false
+
+data:
+  max_train_samples: 64
+  max_eval_samples: 32
+
+train:
+  max_steps: 4
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 1
+  num_generations: 4
+  max_completion_length: 128
+  logging_steps: 1
+  save_steps: 1000
+  use_vllm: false
+
+eval:
+  batch_size: 16
+  max_new_tokens: 128
+  use_vllm: false

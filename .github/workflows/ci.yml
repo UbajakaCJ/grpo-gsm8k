@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      # CI is CPU-only: reward/extraction/config/report logic is tested without torch.
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: pytest -q
+      - name: Validate configs load
+        run: |
+          python -c "from grpo_gsm8k.config import load_config as l; \
+          [l(p) for p in ('configs/colab_a100.yaml','configs/smoke.yaml')]; print('configs ok')"

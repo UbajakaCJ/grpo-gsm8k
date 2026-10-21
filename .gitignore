@@ -1,0 +1,15 @@
+# model checkpoints are large: keep them out of git (push to the HF Hub instead)
+outputs/
+wandb/
+results/smoke/
+*.safetensors
+*.bin
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+.env
